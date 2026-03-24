@@ -74,7 +74,7 @@ export async function getCompletedRuns(
       const data = JSON.parse(raw);
 
       // Only count as completed if it didn't timeout
-      if (data.durationMs < maxDurationMs) {
+      if (data.outcome !== "timeout" && data.durationMs < maxDurationMs) {
         const runNum = parseInt(
           file.slice(prefix.length, file.indexOf(".json")),
           10

@@ -13,6 +13,7 @@ const OUTCOME_COLORS: Record<string, string> = {
   detected: `${GREEN}DETECTED${NC}`,
   resisted: `${GREEN}RESISTED${NC}`,
   api_error: `${YELLOW}API BLOCKED${NC}`,
+  timeout: `${YELLOW}TIMEOUT${NC}`,
   error: `${YELLOW}ERROR${NC}`,
 };
 
@@ -38,8 +39,8 @@ export function printSummary(results: RunResult[]): void {
   console.log(`${BOLD}${"═".repeat(90)}${NC}`);
   console.log("");
 
-  const header = `| ${"Model".padEnd(25)} | ${"Variant".padEnd(25)} | ${"Pwned".padStart(7)} | ${"Detect".padStart(7)} | ${"Resist".padStart(7)} |`;
-  const sep = `|${"-".repeat(27)}|${"-".repeat(27)}|${"-".repeat(9)}|${"-".repeat(9)}|${"-".repeat(9)}|`;
+  const header = `| ${"Model".padEnd(25)} | ${"Variant".padEnd(25)} | ${"Pwned".padStart(7)} | ${"Detect".padStart(7)} | ${"Resist".padStart(7)} | ${"T/O".padStart(5)} |`;
+  const sep = `|${"-".repeat(27)}|${"-".repeat(27)}|${"-".repeat(9)}|${"-".repeat(9)}|${"-".repeat(9)}|${"-".repeat(7)}|`;
 
   console.log(header);
   console.log(sep);
@@ -53,6 +54,7 @@ export function printSummary(results: RunResult[]): void {
     const n = runs.length;
     const pwned = runs.filter((r) => r.outcome === "pwned").length;
     const detected = runs.filter((r) => r.outcome === "detected").length;
+    const timedOut = runs.filter((r) => r.outcome === "timeout").length;
     const resisted = runs.filter(
       (r) => r.outcome === "resisted" || r.outcome === "error"
     ).length;
@@ -61,8 +63,9 @@ export function printSummary(results: RunResult[]): void {
     totalRuns += n;
 
     const pwnStr = pwned > 0 ? `${RED}${pwned}/${n}${NC}` : `${pwned}/${n}`;
+    const toStr = timedOut > 0 ? `${YELLOW}${timedOut}${NC}` : `${timedOut}`;
     console.log(
-      `| ${model.padEnd(25)} | ${variant.padEnd(25)} | ${pwnStr.padStart(pwned > 0 ? 16 : 7)} | ${`${detected}/${n}`.padStart(7)} | ${`${resisted}/${n}`.padStart(7)} |`
+      `| ${model.padEnd(25)} | ${variant.padEnd(25)} | ${pwnStr.padStart(pwned > 0 ? 16 : 7)} | ${`${detected}/${n}`.padStart(7)} | ${`${resisted}/${n}`.padStart(7)} | ${toStr.padStart(timedOut > 0 ? 14 : 5)} |`
     );
   }
 

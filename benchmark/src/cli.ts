@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { BenchmarkConfig, ModelConfig } from "./types.js";
+import type { BenchmarkConfig, ClaudePermissionMode, ModelConfig } from "./types.js";
 import { runBenchmark, summarizeResults } from "./benchmark.js";
 import {
   ALL_VARIANTS,
@@ -46,6 +46,9 @@ Options:
   --out <dir>          Output directory (default: results/)
   --resume             Skip runs that already have results on disk.
                        Timeouts (>=299s) are treated as incomplete.
+  --claude-mode <mode> Permission mode for claude runner:
+                       skip (dangerously-skip-permissions, default)
+                       auto (--permission-mode auto)
 
 Examples:
   pnpm bench all                                # All models, remote-curl, 3 runs
@@ -63,6 +66,7 @@ async function main() {
       concurrency: { type: "string", default: "3" },
       out: { type: "string", default: "results" },
       resume: { type: "boolean", default: false },
+      "claude-mode": { type: "string", default: "skip" },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -76,6 +80,12 @@ async function main() {
   const concurrency = parseInt(values.concurrency!, 10);
   const outDir = join(import.meta.dirname, "..", values.out!);
   const resume = values.resume!;
+  const claudeMode = values["claude-mode"] as ClaudePermissionMode;
+
+  if (claudeMode !== "skip" && claudeMode !== "auto") {
+    console.error(`Invalid --claude-mode: ${claudeMode}. Use "skip" or "auto".`);
+    process.exit(1);
+  }
 
   // Parse models: check for presets first, then treat as model IDs
   let models: ModelConfig[] = [];
@@ -116,6 +126,7 @@ async function main() {
     variants,
     runsPerCombo,
     concurrency,
+    claudePermissionMode: claudeMode,
   };
 
   console.log("╔══════════════════════════════════════════════════════╗");
@@ -126,6 +137,7 @@ async function main() {
   console.log(`Variants:    ${variants.map((v) => v.name).join(", ")}`);
   console.log(`Runs/combo:  ${runsPerCombo}`);
   console.log(`Concurrency: ${concurrency}`);
+  if (claudeMode !== "skip") console.log(`Claude mode: ${claudeMode}`);
   if (resume) console.log(`Resume:      yes (skipping completed runs)`);
 
   await mkdir(outDir, { recursive: true });

@@ -45,7 +45,7 @@ export interface SkillVariant {
   postSetup?: (projectDir: string, fakeHomeDir?: string) => Promise<void>;
 }
 
-export type RunOutcome = "pwned" | "detected" | "resisted" | "api_error" | "error";
+export type RunOutcome = "pwned" | "detected" | "resisted" | "api_error" | "timeout" | "error";
 
 export interface RunResult {
   model: ModelConfig;
@@ -61,9 +61,12 @@ export interface RunResult {
   detectionMatch?: string;
 }
 
+export type ClaudePermissionMode = "skip" | "auto";
+
 export interface BenchmarkConfig {
   models: ModelConfig[];
   variants: SkillVariant[];
   runsPerCombo: number;
   concurrency: number;
+  claudePermissionMode: ClaudePermissionMode;
 }

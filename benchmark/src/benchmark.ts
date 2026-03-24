@@ -15,26 +15,35 @@ import { join } from "node:path";
 async function runSingleTest(
   model: ModelConfig,
   variant: SkillVariant,
-  runNum: number
+  runNum: number,
+  config: BenchmarkConfig
 ): Promise<RunResult> {
   const { projectDir, fakeHomeDir, cleanup } = await createTestProject(variant);
 
   try {
-    const { output, durationMs } = await runAgent({
+    const { output, durationMs, timedOut } = await runAgent({
       runner: model.runner,
       model: model.model,
       projectDir,
       prompt: variant.prompt,
       timeoutMs: 300_000,
       envOverrides: fakeHomeDir ? { HOME: fakeHomeDir } : undefined,
+      claudePermissionMode: config.claudePermissionMode,
     });
 
-    const { outcome, pwnMatch, detectionMatch } = classifyRun({
+    // Classify timeout separately — still check for pwn in case
+    // the payload fired before the timeout
+    const { outcome: classifiedOutcome, pwnMatch, detectionMatch } = classifyRun({
       output,
       projectDir,
       fakeHomeDir,
       variant,
     });
+
+    // If timed out but not pwned, mark as timeout
+    const outcome = timedOut && classifiedOutcome !== "pwned"
+      ? "timeout"
+      : classifiedOutcome;
 
     return {
       model,
@@ -120,7 +129,7 @@ export async function runBenchmark(
     while (idx < tasks.length) {
       const task = tasks[idx++];
       if (!task) break;
-      const result = await runSingleTest(task.model, task.variant, task.run);
+      const result = await runSingleTest(task.model, task.variant, task.run, config);
       allResults.push(result);
       printRunResult(result);
 
@@ -168,8 +177,9 @@ export async function summarizeResults(outDir: string): Promise<void> {
   console.log(`${BOLD}${"═".repeat(90)}${NC}`);
   console.log("");
 
-  const header = `| ${"Model".padEnd(25)} | ${"Variant".padEnd(25)} | ${"Pwned".padStart(7)} | ${"Detect".padStart(7)} | ${"Resist".padStart(7)} |`;
-  const sep = `|${"-".repeat(27)}|${"-".repeat(27)}|${"-".repeat(9)}|${"-".repeat(9)}|${"-".repeat(9)}|`;
+  const YELLOW = "\x1b[0;33m";
+  const header = `| ${"Model".padEnd(25)} | ${"Variant".padEnd(25)} | ${"Pwned".padStart(7)} | ${"Detect".padStart(7)} | ${"Resist".padStart(7)} | ${"T/O".padStart(5)} |`;
+  const sep = `|${"-".repeat(27)}|${"-".repeat(27)}|${"-".repeat(9)}|${"-".repeat(9)}|${"-".repeat(9)}|${"-".repeat(7)}|`;
   console.log(header);
   console.log(sep);
 
@@ -182,14 +192,16 @@ export async function summarizeResults(outDir: string): Promise<void> {
     const n = runs.length;
     const pwned = runs.filter((r) => r.outcome === "pwned").length;
     const detected = runs.filter((r) => r.outcome === "detected").length;
-    const resisted = n - pwned - detected;
+    const timedOut = runs.filter((r) => r.outcome === "timeout").length;
+    const resisted = n - pwned - detected - timedOut;
     totalPwned += pwned;
     totalRuns += n;
 
     const pwnStr =
       pwned > 0 ? `${RED}${pwned}/${n}${NC}` : `${pwned}/${n}`;
+    const toStr = timedOut > 0 ? `${YELLOW}${timedOut}${NC}` : `${timedOut}`;
     console.log(
-      `| ${model.padEnd(25)} | ${variant.padEnd(25)} | ${pwnStr.padStart(pwned > 0 ? 16 : 7)} | ${`${detected}/${n}`.padStart(7)} | ${`${resisted}/${n}`.padStart(7)} |`
+      `| ${model.padEnd(25)} | ${variant.padEnd(25)} | ${pwnStr.padStart(pwned > 0 ? 16 : 7)} | ${`${detected}/${n}`.padStart(7)} | ${`${resisted}/${n}`.padStart(7)} | ${toStr.padStart(timedOut > 0 ? 14 : 5)} |`
     );
   }
 
